@@ -1,15 +1,62 @@
-# Entur - Tavla
+# Tavla Backend
 
-Med «Tavla» kan du sette opp egne, spesialtilpassede avgangstavler for all offentlig transport i Norge. Løsningen utvikles av Entur, og er helt gratis og tilgjengelig for alle. Logg inn på [tavla.entur.no](https://tavla.entur.no/)
+A simple, containerized backend service for managing board data with in-memory storage.
 
-for å komme i gang! Abonner på oppdateringer til Tavla ved å klikke på “Watch”.
+## Features
 
-## Bidrag
+- In-memory data storage
+- RESTful API endpoints
+- Bearer token authentication
+- Docker support
+- Single-user focused
 
-Har du funnet en feil eller har du en idé til noe som kunne vært bedre? Opprett et [issue](https://github.com/entur/tavla/issues/new) her på Github, så skal vi se på det!
+## API Endpoints
 
-### Lisenser og betingelser
+- `GET /active` - List all active boards
+- `POST /refresh/:bid` - Update board data
+- `POST /update/:bid` - Remove a board
+- `GET /alive` - Health check
 
-- Kildekoden er under EUPL-1.2 lisens.
-- Fonter har separat [lisens](https://playtype.com/typefaces/nationale/).
-- Alle Enturs varemerker skal kun brukes av Entur (logo, illustrasjoner og bilder).
+## Requirements
+
+- Rust
+- Docker (optional, for containerization)
+
+## Environment Variables
+
+- `HOST` - Server host (default: "0.0.0.0")
+- `PORT` - Server port (default: "3000")
+- `BACKEND_API_KEY` - API key for authentication (required)
+
+## Running Locally
+
+1. Set environment variables:
+   ```bash
+   set BACKEND_API_KEY=your-api-key
+   ```
+
+2. Build and run:
+   ```bash
+   cd backend
+   cargo build
+   cargo run
+   ```
+
+## Running with Docker
+
+1. Build the container:
+   ```bash
+   cd backend
+   docker build -t tavla-backend .
+   ```
+
+2. Run the container:
+   ```bash
+   docker run -p 3000:3000 -e BACKEND_API_KEY=your-api-key tavla-backend
+   ```
+
+## Authentication
+
+All endpoints require Bearer token authentication. Include the API key in the Authorization header:
+```
+Authorization: Bearer your-api-key

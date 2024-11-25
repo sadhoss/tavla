@@ -1,19 +1,15 @@
+use std::collections::HashMap;
 use axum::{
-    body::Body,
-    http::{Response, StatusCode},
+    http::StatusCode,
     response::IntoResponse,
 };
-use redis::{
-    aio::MultiplexedConnection, from_redis_value, AsyncCommands, Client, FromRedisValue,
-    ToRedisArgs,
-};
+use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
-use serde_json::{to_string, Value};
+use serde_json::Value;
 
 #[derive(Clone)]
 pub struct AppState {
-    pub master: MultiplexedConnection,
-    pub replicas: Client,
+    pub storage: std::sync::Arc<RwLock<HashMap<String, Value>>>,
     pub key: String,
 }
 
@@ -22,7 +18,6 @@ pub struct AppState {
 pub enum Message {
     Refresh { payload: Value },
     Update,
-    Timeout,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -31,69 +26,12 @@ pub enum BoardAction {
     Update,
 }
 
-impl FromRedisValue for BoardAction {
-    fn from_redis_value(v: &redis::Value) -> redis::RedisResult<Self> {
-        let s: String = from_redis_value(v)?;
-        Ok(serde_json::from_str::<BoardAction>(&s)?)
-    }
-}
-
-impl ToRedisArgs for BoardAction {
-    fn write_redis_args<W>(&self, out: &mut W)
-    where
-        W: ?Sized + redis::RedisWrite,
-    {
-        match to_string(self) {
-            Ok(s) => out.write_arg_fmt(s),
-            Err(_) => out.write_arg_fmt(0_u8),
-        }
-    }
-}
-
-pub struct Guard {
-    pub master: MultiplexedConnection,
-}
-
-impl Guard {
-    pub fn new(master: MultiplexedConnection) -> Self {
-        let mut m = master.clone();
-        tokio::spawn(async move {
-            let _ = m.incr::<&str, i32, i32>("active_boards", 1).await;
-        });
-        Guard { master }
-    }
-}
-
-impl Drop for Guard {
-    fn drop(&mut self) {
-        let mut m = self.master.clone();
-        tokio::spawn(async move {
-            let _ = m.decr::<&str, i32, i32>("active_boards", 1).await;
-        });
-    }
-}
-
-impl IntoResponse for Message {
-    fn into_response(self) -> axum::response::Response {
-        if let Ok(json_string) = to_string(&self) {
-            if let Ok(res) = Response::builder()
-                .header("Content-type", "application/json")
-                .body(Body::from(json_string))
-            {
-                return res;
-            }
-        }
-        StatusCode::INTERNAL_SERVER_ERROR.into_response()
-    }
-}
-
-pub struct AppError {
-    _e: anyhow::Error,
-}
+#[derive(Debug)]
+pub struct AppError(anyhow::Error);
 
 impl IntoResponse for AppError {
     fn into_response(self) -> axum::response::Response {
-        StatusCode::INTERNAL_SERVER_ERROR.into_response()
+        (StatusCode::INTERNAL_SERVER_ERROR, self.0.to_string()).into_response()
     }
 }
 
@@ -102,6 +40,6 @@ where
     E: Into<anyhow::Error>,
 {
     fn from(err: E) -> Self {
-        Self { _e: err.into() }
+        Self(err.into())
     }
 }

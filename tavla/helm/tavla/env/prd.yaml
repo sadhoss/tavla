@@ -1,7 +1,0 @@
-common:
-    env: prd
-    ingress:
-        host: tavla.entur.no
-    configmap:
-        data:
-            GOOGLE_PROJECT_ID: ent-tavla-prd
